@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Netcat</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Netcat</h1>
+            <p class="subtitle">Network Connectivity and Port Scanning Tool</p>
+        </header>
+
+        <main>
+            <!-- Navigation Tabs -->
+            <div class="tabs">
+                <button class="tab-button active" data-tab="connect">TCP Connect</button>
+                <button class="tab-button" data-tab="listen">TCP Listen</button>
+                <button class="tab-button" data-tab="scan">Port Scan</button>
+            </div>
+
+            <!-- TCP Connect Tab -->
+            <div id="connect" class="tab-content active">
+                <h2>Connect to Remote Host</h2>
+                <form id="connect-form">
+                    <div class="form-group">
+                        <label for="connect-host">Hostname/IP:</label>
+                        <input type="text" id="connect-host" placeholder="example.com or 192.168.1.1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="connect-port">Port:</label>
+                        <input type="number" id="connect-port" min="1" max="65535" placeholder="80" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="connect-timeout">Timeout (seconds):</label>
+                        <input type="number" id="connect-timeout" min="1" max="60" value="5">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Connect</button>
+                </form>
+                <div id="connect-result" class="result-container"></div>
+                <div id="connect-session" class="session-container"></div>
+            </div>
+
+            <!-- TCP Listen Tab -->
+            <div id="listen" class="tab-content">
+                <h2>Listen for Incoming Connection</h2>
+                <form id="listen-form">
+                    <div class="form-group">
+                        <label for="listen-port">Local Port:</label>
+                        <input type="number" id="listen-port" min="1024" max="65535" placeholder="9999" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="listen-timeout">Timeout (seconds):</label>
+                        <input type="number" id="listen-timeout" min="1" max="120" value="30">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Start Listening</button>
+                </form>
+                <div id="listen-result" class="result-container"></div>
+                <div id="listen-session" class="session-container"></div>
+            </div>
+
+            <!-- Port Scan Tab -->
+            <div id="scan" class="tab-content">
+                <h2>Scan Ports on Target Host</h2>
+                <form id="scan-form">
+                    <div class="form-group">
+                        <label for="scan-host">Hostname/IP:</label>
+                        <input type="text" id="scan-host" placeholder="example.com or 192.168.1.1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="scan-ports">Ports (e.g., 20-25,80,443):</label>
+                        <input type="text" id="scan-ports" placeholder="20-25,80,443,8000-8010" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="scan-timeout">Timeout per port (seconds):</label>
+                        <input type="number" id="scan-timeout" min="1" max="10" value="2">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Start Scan</button>
+                </form>
+                <div id="scan-result" class="result-container"></div>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
