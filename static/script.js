@@ -119,7 +119,9 @@ function closeConnectSession() {
 
     activeSessions.connect = null;
     document.getElementById('connect-session').classList.remove('show');
+    document.getElementById('connect-session').innerHTML = '';
     document.getElementById('connect-result').classList.remove('show');
+    document.getElementById('connect-result').innerHTML = '';
     document.getElementById('connect-form').style.display = '';
 }
 
@@ -223,7 +225,9 @@ function closeListenSession() {
 
     activeSessions.listen = null;
     document.getElementById('listen-session').classList.remove('show');
+    document.getElementById('listen-session').innerHTML = '';
     document.getElementById('listen-result').classList.remove('show');
+    document.getElementById('listen-result').innerHTML = '';
     document.getElementById('listen-form').style.display = '';
 }
 
