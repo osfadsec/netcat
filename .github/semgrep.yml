@@ -1,0 +1,92 @@
+name: Semgrep Security Scan
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+  push:
+    branches:
+      - main
+
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+    container:
+      image: returntocorp/semgrep
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Semgrep security scan
+        run: |
+          semgrep --config=p/python \
+                   --config=p/flask \
+                   --config=p/security-audit \
+                   --config=p/owasp-top-ten \
+                   --config=p/gitleaks \
+                   --json \
+                   --output=semgrep-report.json \
+                   . || exit_code=$?
+        continue-on-error: true
+
+      - name: Check for credentials/secrets
+        run: |
+          semgrep --config=p/gitleaks \
+                   --json \
+                   --output=secrets-report.json \
+                   . || exit_code=$?
+        continue-on-error: true
+
+      - name: Upload results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep-report.json
+          category: semgrep
+
+      - name: Display security findings
+        if: always()
+        run: |
+          echo "=== Semgrep Results ===" 
+          if [ -f semgrep-report.json ]; then
+            total=$(jq '.results | length' semgrep-report.json)
+            critical=$(jq '[.results[] | select(.extra.severity=="CRITICAL")] | length' semgrep-report.json)
+            high=$(jq '[.results[] | select(.extra.severity=="HIGH")] | length' semgrep-report.json)
+            echo "Total Issues: $total"
+            echo "Critical: $critical"
+            echo "High: $high"
+            jq '.results[] | "[\(.extra.severity)] \(.message) (\(.rule_id))"' semgrep-report.json
+          fi
+          
+          echo ""
+          echo "=== Secrets Detection ===" 
+          if [ -f secrets-report.json ]; then
+            secrets=$(jq '.results | length' secrets-report.json)
+            echo "Detected secrets: $secrets"
+            if [ "$secrets" -gt 0 ]; then
+              jq '.results[] | "\(.rule_id): \(.message)"' secrets-report.json
+            fi
+          fi
+
+      - name: Fail on critical issues
+        if: always()
+        run: |
+          if [ -f semgrep-report.json ]; then
+            critical=$(jq '[.results[] | select(.extra.severity=="CRITICAL")] | length' semgrep-report.json)
+            if [ "$critical" -gt 0 ]; then
+              echo "❌ Found $critical CRITICAL security issues"
+              exit 1
+            fi
+          fi
+          
+          if [ -f secrets-report.json ]; then
+            secrets=$(jq '.results | length' secrets-report.json)
+            if [ "$secrets" -gt 0 ]; then
+              echo "❌ Found $secrets potential secrets/credentials"
+              exit 1
+            fi
+          fi
