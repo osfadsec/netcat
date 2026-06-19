@@ -1,0 +1,76 @@
+name: Semgrep Security Scan
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+      - master
+  push:
+    branches:
+      - main
+      - develop
+      - master
+
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      pull-requests: write
+      security-events: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Semgrep scan
+        uses: returntocorp/semgrep-action@v1
+        with:
+          generateSarif: true
+          config: >-
+            p/security-audit
+            p/owasp-top-ten
+            p/cwe-top-25
+            p/ci
+            p/dockerfile
+            p/bandit
+
+      - name: Upload SARIF report
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            if (fs.existsSync('semgrep.sarif')) {
+              const sarif = JSON.parse(fs.readFileSync('semgrep.sarif', 'utf8'));
+              const issues = sarif.runs[0].results || [];
+              
+              if (issues.length > 0) {
+                const critical = issues.filter(i => i.level === 'error').length;
+                const warning = issues.filter(i => i.level === 'warning').length;
+                const note = issues.filter(i => i.level === 'note').length;
+                
+                let comment = `## 🔍 Semgrep Security Scan Results\n\n`;
+                comment += `- 🔴 **Critical**: ${critical}\n`;
+                comment += `- ⚠️ **Warnings**: ${warning}\n`;
+                comment += `- ℹ️ **Info**: ${note}\n\n`;
+                
+                github.rest.issues.createComment({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: comment
+                });
+              }
+            }
