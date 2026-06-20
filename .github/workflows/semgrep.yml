@@ -62,7 +62,7 @@ jobs:
       - name: Run Semgrep scan
         uses: semgrep/semgrep-action@v1
         with:
-          # Use the default high-confidence ruleset
+          # Use the default high-confidence rulesets
           config: >-
             p/security-audit
             p/owasp-top-ten
@@ -74,8 +74,9 @@ jobs:
 
       # Step 3: Upload results to GitHub Security tab
       # This makes findings visible in the Security -> Code scanning section
+      # Using v3 (latest, replaces deprecated v2)
       - name: Upload SARIF results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
           sarif_file: semgrep.sarif
