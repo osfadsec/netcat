@@ -1,0 +1,63 @@
+name: Semgrep Security Scan
+
+on:
+  pull_request:
+    branches:
+      - main
+      - test
+  push:
+    branches:
+      - test
+
+jobs:
+  semgrep:
+    name: Semgrep Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/python
+            p/owasp-top-ten
+            p/flask
+            p/bandit
+            p/django
+          
+      # Optional: Create a comment on PR with results
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const sarif = JSON.parse(fs.readFileSync('semgrep.sarif', 'utf8'));
+            const issues = sarif.runs[0]?.results || [];
+            
+            if (issues.length === 0) {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: '✅ **Semgrep Security Scan Passed!** No security issues found.'
+              });
+            } else {
+              const summary = `🔒 **Semgrep Security Scan Results**\n\nFound **${issues.length}** potential issues:\n\n`;
+              const details = issues.slice(0, 10).map(issue => {
+                return `- **${issue.ruleId}**: ${issue.message.text}`;
+              }).join('\n');
+              
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: summary + details + (issues.length > 10 ? `\n\n... and ${issues.length - 10} more issues. Check the Security tab for full details.` : '')
+              });
+            }
