@@ -48,6 +48,7 @@ jobs:
       contents: read      # Read repository contents
       security-events: write  # Upload SARIF results to Security tab
       actions: read       # Read workflow information
+      pull-requests: write  
       issues: write
 
     steps:
