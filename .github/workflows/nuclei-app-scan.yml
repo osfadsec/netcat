@@ -1,0 +1,62 @@
+name: Nuclei Scan
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  nuclei:
+    name: Nuclei Vulnerability Scanner
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7.0.0
+
+      - name: Run Nuclei scan
+        uses: projectdiscovery/nuclei-action@v3.1.0
+        with:
+          args: -u http://localhost:5000 -severity critical,high -json -o nuclei-results.json
+        continue-on-error: true
+
+      - name: Upload results
+        uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: nuclei-results
+          path: nuclei-results.json
+          retention-days: 30
+
+      - name: Create issue if critical found
+        if: always()
+        uses: actions/github-script@v9.0.0
+        with:
+          script: |
+            const fs = require('fs');
+            if (!fs.existsSync('nuclei-results.json')) return;
+            
+            const data = fs.readFileSync('nuclei-results.json', 'utf8');
+            const lines = data.trim().split('\n').filter(l => l.trim());
+            const results = lines.map(l => {
+              try { return JSON.parse(l); } catch { return null; }
+            }).filter(Boolean);
+            
+            const critical = results.filter(r => r.info?.severity === 'critical');
+            
+            if (critical.length > 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: '🚨 Critical Vulnerabilities Found by Nuclei',
+                body: `Found ${critical.length} critical issues\n\n${critical.map(r => `- ${r.info?.name}`).join('\n')}`,
+                labels: ['security', 'critical']
+              });
+            }
+        continue-on-error: true
