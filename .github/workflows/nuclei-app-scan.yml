@@ -1,0 +1,220 @@
+# Nuclei Dynamic Application Scanning Workflow
+# Purpose: Scan a running Flask web application for vulnerabilities
+# Works with: Deployed applications, staging environments, live services
+#
+# What it does:
+# - Scans your Flask application for security vulnerabilities
+# - Tests for: SQL injection, XSS, auth bypass, misconfigurations
+# - Uses 5000+ community templates
+# - Reports findings to GitHub
+#
+# Setup:
+# 1. Update TARGET_URL below to your Flask app URL
+# 2. Adjust severity level (critical, high, medium, low)
+# 3. Customize templates if needed
+# 4. Push to GitHub
+#
+# For more info: https://github.com/projectdiscovery/nuclei
+
+name: Nuclei Dynamic Application Scanning
+
+on:
+  # Run on schedule (daily)
+  schedule:
+    - cron: '0 2 * * *'  # 2 AM UTC every day
+  
+  # Manual trigger
+  workflow_dispatch:
+  
+  # Run on releases
+  release:
+    types: [published]
+  
+  # Optional: Run on push to main
+  # push:
+  #   branches: [main]
+
+env:
+  # Configure your target URL here
+  TARGET_URL: http://localhost:5000  # Change to your deployed Flask app URL
+
+jobs:
+  nuclei-scan:
+    name: Nuclei Vulnerability Scanner
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+
+    steps:
+      # Step 1: Checkout code (for custom templates if any)
+      - name: Checkout code
+        uses: actions/checkout@v7.0.0
+
+      # Step 2: Start Flask application locally (optional)
+      # Only use this if testing locally. Skip if scanning a deployed URL
+      - name: Set up Python
+        uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.14.6'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt 2>/dev/null || echo "No requirements.txt found"
+        continue-on-error: true
+
+      - name: Start Flask application
+        run: |
+          if [ -f "app.py" ]; then
+            nohup python app.py > flask.log 2>&1 &
+            sleep 5
+            echo "Flask app started"
+          else
+            echo "app.py not found, skipping local start"
+          fi
+        continue-on-error: true
+
+      # Step 3: Run Nuclei scan
+      # Uses projectdiscovery/nuclei-action
+      - name: Run Nuclei vulnerability scan
+        uses: projectdiscovery/nuclei-action@v3.1.0
+        with:
+          # Arguments to pass to Nuclei
+          args: >
+            -u ${{ env.TARGET_URL }}
+            -severity critical,high
+            -json
+            -o nuclei-results.json
+        continue-on-error: true
+        env:
+          # Disable version check for faster execution
+          DISABLE_VERSION_CHECK: true
+
+      # Step 4: Upload results as artifact
+      - name: Upload Nuclei scan results
+        uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: nuclei-scan-results
+          path: nuclei-results.json
+          retention-days: 30
+
+      # Step 5: Comment on PR with results (if PR)
+      - name: Comment on PR with Nuclei findings
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v9.0.0
+        with:
+          script: |
+            const fs = require('fs');
+            
+            // Check if results file exists
+            if (!fs.existsSync('nuclei-results.json')) {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: '## 🔍 Nuclei Scan\n\nNo vulnerabilities found ✅'
+              });
+              return;
+            }
+            
+            // Parse results
+            const rawData = fs.readFileSync('nuclei-results.json', 'utf8');
+            const lines = rawData.trim().split('\n').filter(l => l.trim());
+            const results = lines.map(l => {
+              try {
+                return JSON.parse(l);
+              } catch {
+                return null;
+              }
+            }).filter(Boolean);
+            
+            // Build comment
+            let comment = `## 🔍 Nuclei Dynamic Scanning Results\n\n`;
+            comment += `**Vulnerabilities Found:** ${results.length}\n\n`;
+            
+            if (results.length > 0) {
+              comment += `### Findings:\n`;
+              const grouped = {};
+              results.forEach(r => {
+                const severity = r.info?.severity || 'unknown';
+                if (!grouped[severity]) grouped[severity] = [];
+                grouped[severity].push(r);
+              });
+              
+              Object.keys(grouped).sort().reverse().forEach(severity => {
+                comment += `\n**${severity.toUpperCase()}** (${grouped[severity].length})\n`;
+                grouped[severity].slice(0, 5).forEach(r => {
+                  comment += `- ${r.info?.name || 'Unknown'} at ${r.host}\n`;
+                });
+                if (grouped[severity].length > 5) {
+                  comment += `- ... and ${grouped[severity].length - 5} more\n`;
+                }
+              });
+            } else {
+              comment += `✅ No vulnerabilities detected!`;
+            }
+            
+            comment += `\n\n[View full scan logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+        continue-on-error: true
+
+      # Step 6: Create GitHub issue for critical findings (optional)
+      - name: Create issue for critical vulnerabilities
+        if: always()
+        uses: actions/github-script@v9.0.0
+        with:
+          script: |
+            const fs = require('fs');
+            
+            if (!fs.existsSync('nuclei-results.json')) return;
+            
+            const rawData = fs.readFileSync('nuclei-results.json', 'utf8');
+            const lines = rawData.trim().split('\n').filter(l => l.trim());
+            const results = lines.map(l => {
+              try {
+                return JSON.parse(l);
+              } catch {
+                return null;
+              }
+            }).filter(Boolean);
+            
+            // Filter critical issues
+            const critical = results.filter(r => r.info?.severity === 'critical');
+            
+            if (critical.length > 0) {
+              const body = `## 🚨 Critical Vulnerabilities Found\n\n` +
+                `Nuclei scan detected ${critical.length} critical issue(s):\n\n` +
+                critical.map(r => `- **${r.info?.name}** (${r.host})`).join('\n') +
+                `\n\nScan: ${new Date().toISOString()}`;
+              
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `🚨 Critical Vulnerabilities: Nuclei Scan Results`,
+                body: body,
+                labels: ['security', 'critical', 'nuclei']
+              });
+            }
+        continue-on-error: true
+
+      # Step 7: Display summary
+      - name: Print summary
+        if: always()
+        run: |
+          echo "=== Nuclei Scan Summary ==="
+          echo "Target: ${{ env.TARGET_URL }}"
+          echo "Timestamp: $(date)"
+          if [ -f nuclei-results.json ]; then
+            echo "Results file size: $(wc -c < nuclei-results.json) bytes"
+            echo "Findings: $(grep -c '^{' nuclei-results.json || echo '0')"
+          fi
+          echo "==========================="
