@@ -8,12 +8,10 @@ import json
 app = Flask(__name__)
 netcat = NetcatCore()
 
-
 @app.route('/')
 def index():
     """Render the main web interface"""
     return render_template('index.html')
-
 
 @app.route('/api/connect', methods=['POST'])
 def connect():
@@ -34,7 +32,6 @@ def connect():
     except Exception as e:
         return jsonify({'error': f'Connection failed: {str(e)}'}), 500
 
-
 @app.route('/api/listen', methods=['POST'])
 def listen():
     """Start listening on a local port"""
@@ -52,7 +49,6 @@ def listen():
         return jsonify({'error': f'Invalid input: {str(e)}'}), 400
     except Exception as e:
         return jsonify({'error': f'Listen failed: {str(e)}'}), 500
-
 
 @app.route('/api/scan', methods=['POST'])
 def scan_ports():
@@ -73,7 +69,6 @@ def scan_ports():
     except Exception as e:
         return jsonify({'error': f'Scan failed: {str(e)}'}), 500
 
-
 @app.route('/api/send', methods=['POST'])
 def send_data():
     """Send data through an active connection"""
@@ -90,7 +85,6 @@ def send_data():
     except Exception as e:
         return jsonify({'error': f'Send failed: {str(e)}'}), 500
 
-
 @app.route('/api/close', methods=['POST'])
 def close_connection():
     """Close an active connection"""
@@ -105,7 +99,6 @@ def close_connection():
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': f'Close failed: {str(e)}'}), 500
-
 
 if __name__ == '__main__':
     app.run(debug=True, host='127.0.0.1', port=5000)
