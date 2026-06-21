@@ -75,22 +75,22 @@ jobs:
 
       # Step 4: Comment findings on PR (optional)
       # Uncomment this section to post Semgrep results as a PR comment
-      # - name: Comment on PR with results
-      #   if: github.event_name == 'pull_request'
-      #   uses: actions/github-script@v6
-      #   with:
-      #     script: |
-      #       const fs = require('fs');
-      #       const semgrepOutput = fs.existsSync('semgrep.sarif') 
-      #         ? JSON.parse(fs.readFileSync('semgrep.sarif', 'utf8')) 
-      #         : { runs: [] };
-      #       
-      #       const results = semgrepOutput.runs[0]?.results || [];
-      #       if (results.length === 0) {
-      #         github.rest.issues.createComment({
-      #           issue_number: context.issue.number,
-      #           owner: context.repo.owner,
-      #           repo: context.repo.repo,
-      #           body: '✅ Semgrep scan passed with no findings!'
-      #         });
-      #       }
+      - name: Comment on PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const semgrepOutput = fs.existsSync('semgrep.sarif') 
+              ? JSON.parse(fs.readFileSync('semgrep.sarif', 'utf8')) 
+              : { runs: [] };
+            
+            const results = semgrepOutput.runs[0]?.results || [];
+            if (results.length === 0) {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: '✅ Semgrep scan passed with no findings!'
+              });
+            }
