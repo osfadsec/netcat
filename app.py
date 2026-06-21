@@ -32,7 +32,6 @@ def connect():
     except Exception as e:
         return jsonify({'error': f'Connection failed: {str(e)}'}), 500
 
-
 @app.route('/api/listen', methods=['POST'])
 def listen():
     """Start listening on a local port"""
@@ -100,7 +99,6 @@ def close_connection():
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': f'Close failed: {str(e)}'}), 500
-
 
 if __name__ == '__main__':
     app.run(debug=True, host='127.0.0.1', port=5000)
