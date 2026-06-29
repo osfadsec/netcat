@@ -1,0 +1,7 @@
+services: # list of containers
+  netcat:
+    build: . # build an image from the Dockerfile in the current directory
+    container_name: netcat # container name (useful for logs)
+    ports: # port forwarding
+      - "5000:5000"
+    restart: unless-stopped # automatically restart the container
