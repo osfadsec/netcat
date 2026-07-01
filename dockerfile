@@ -1,4 +1,5 @@
-FROM python:3.13-slim
+# ---- Builder stage ----
+FROM python:3.13-slim AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
@@ -8,7 +9,18 @@ COPY pyproject.toml uv.lock ./
 
 RUN uv sync --frozen --no-dev
 
-COPY . .
+# ---- Runtime stage ----
+FROM python:3.13-slim
+
+WORKDIR /app
+
+# Only the built virtualenv from the builder stage
+COPY --from=builder /app/.venv /app/.venv
+
+# Only the application files needed at runtime
+COPY app.py netcat_core.py ./
+COPY templates ./templates
+COPY static ./static
 
 ENV PATH="/app/.venv/bin:$PATH"
 
